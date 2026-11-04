@@ -1,0 +1,8 @@
+{
+  "name": "SNP Stream Wrangler",
+  "icon": "📡",
+  "group": "Design",
+  "description": "Selenio Network Processor and SMPTE ST 2110 / ST 2022-7 Red and Blue leg dual-path redundancy wrangler",
+  "entrypoint": "index.html",
+  "blockTypes": ["snpwrangler", "st2110", "st2022_7", "multicast"]
+}
