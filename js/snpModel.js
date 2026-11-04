@@ -6,6 +6,8 @@ export class SnpModel {
     this.id = initialData?.id || `snp_${Date.now()}`;
     this.unitName = initialData?.unitName || 'SNP-CORE-01';
     this.mgmtIp = initialData?.mgmtIp || '10.200.1.51';
+    // The discovered unit this block describes: its MAC or serial (never its IP), '' when unbound.
+    this.deviceId = initialData?.deviceId || '';
     this.personalities = initialData?.personalities || ['ST2110-20 HD/UHD', 'ST2110-30 Audio Mux', 'Color Corrector', 'Multiviewer Head'];
 
     this.rows = initialData?.rows || [
@@ -187,12 +189,23 @@ export class SnpModel {
     return lines.join('\n');
   }
 
+  /** Bind this block to a discovered unit (APKSoftapp thing): identity is its MAC / serial. */
+  bindDevice(thing) {
+    const id = thing && (thing.mac || thing.serial || thing.agent);
+    if (!id) return false;
+    this.deviceId = id;
+    if (thing.name) this.unitName = thing.name;
+    if (thing.ips && thing.ips[0]) this.mgmtIp = thing.ips[0];
+    return true;
+  }
+
   toJSON() {
     return {
       type: 'snpwrangler',
       id: this.id,
       unitName: this.unitName,
       mgmtIp: this.mgmtIp,
+      deviceId: this.deviceId,
       personalities: this.personalities,
       rows: this.rows,
     };

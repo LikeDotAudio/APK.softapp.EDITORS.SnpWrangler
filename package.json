@@ -4,6 +4,6 @@
   "type": "module",
   "description": "Selenio Network Processor and SMPTE ST 2110 / ST 2022-7 Red and Blue leg dual-path redundancy wrangler",
   "scripts": {
-    "test": "node --test test/snp.test.mjs"
+    "test": "node --test test/*.test.mjs"
   }
 }
