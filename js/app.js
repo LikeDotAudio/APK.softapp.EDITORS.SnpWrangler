@@ -4,7 +4,7 @@
 import { SnpModel } from './snpModel.js';
 import { renderSnpFlowSvg } from './snpSvg.js';
 import { connectSnpHost, blockMeta } from './snpHost.js';
-import { showDiscovered, loadDiscoveredConfig } from './discoveredPanel.js';
+import { signalTypeOptions } from './signalTypes.js';
 
 const S = window.APKSoftapp;
 const esc = S ? S.esc : (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -58,9 +58,7 @@ function renderInspector() {
         <div>
           <label style="display: block; font-size: 10px; color: var(--osc-text-muted); margin-bottom: 3px;">SIGNAL TYPE</label>
           <select class="input" id="inp-signal">
-            <option value="VIDEO" ${row.signalType === 'VIDEO' ? 'selected' : ''}>VIDEO (ST 2110-20)</option>
-            <option value="AUDIO" ${row.signalType === 'AUDIO' ? 'selected' : ''}>AUDIO (ST 2110-30)</option>
-            <option value="ANC" ${row.signalType === 'ANC' ? 'selected' : ''}>ANCILLARY DATA (ST 2110-40)</option>
+            ${signalTypeOptions(row.signalType, esc)}
           </select>
         </div>
 
@@ -199,6 +197,28 @@ function renderAll() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  if (S) S.describe({
+    name: 'SNP Stream Wrangler',
+    does: 'Lays out the ST 2110 senders of one SNP unit with their primary (red) and secondary (blue, ST 2022-7) multicast legs, and audits the legs for collisions.',
+    inputs: [
+      { name: 'SNP block', from: 'the CAD drawing (snpwrangler block) when opened from the CAD', kind: 'cad' },
+      { name: 'Block file', from: 'a .json saved by this editor, picked with Open Block', kind: 'file' },
+      { name: 'Discovered', from: 'what the bus has discovered; which kinds show is config/discovered.json', kind: 'bus' },
+    ],
+    outputs: [
+      { name: 'SNP block', to: 'the CAD drawing on Save & Return, or a .json download when standalone', kind: 'file' },
+      { name: 'Stream CSV', to: '<unit>_streams.csv download (Export CSV)', kind: 'file' },
+    ],
+    controls: [
+      { name: 'Add stream leg', how: '➕ Add Stream Leg' },
+      { name: 'Select a stream', how: 'Click its row in the pipeline drawing; click empty canvas to deselect' },
+      { name: 'Edit a stream', how: 'Inspector: enabled, signal type, TX name, nickname, red/blue multicast IP and port' },
+      { name: 'Delete a stream', how: '🗑️ Delete in the inspector' },
+      { name: 'Bind to a discovered unit', how: '⚡ Discovered, then Bind on its row' },
+      { name: 'Export CSV / Save & Return / Close', how: 'Top-bar buttons' },
+    ],
+    problems: ['file_unreadable', 'bad_json', 'bad_input', 'bus_missing'],
+  });
   renderAll();
 
   document.getElementById('btn-add-stream')?.addEventListener('click', () => {
@@ -227,14 +247,30 @@ document.addEventListener('DOMContentLoaded', () => {
       const file = e.target.files?.[0];
       if (!file) return;
       const reader = new FileReader();
+      const again = () => input.click();
       reader.onload = (event) => {
+        let parsed;
         try {
-          const parsed = JSON.parse(event.target.result);
-          loadLocal(new SnpModel(parsed));
+          parsed = JSON.parse(event.target.result);
         } catch (err) {
-          alert('Failed to parse SNP stream json: ' + err.message);
+          const fix = /\.csv$/i.test(file.name)
+            ? ['Open takes a .json SNP block. A .csv is what Export CSV writes; it cannot be opened back — open the .json saved with Save & Return instead.']
+            : [];
+          if (S) S.showProblem('bad_json', { subject: file.name, detail: err.message, fix, onRetry: again });
+          return;
         }
+        if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.rows)) {
+          if (S) S.showProblem('bad_input', {
+            subject: file.name,
+            detail: 'This is not an SNP stream block: it has no "rows" list of streams.',
+            fix: ['Open a .json saved by this editor (Save & Return when standalone downloads one).'],
+            onRetry: again,
+          });
+          return;
+        }
+        loadLocal(new SnpModel(parsed));
       };
+      reader.onerror = () => S && S.showProblem('file_unreadable', { subject: file.name, detail: reader.error && reader.error.message, onRetry: again });
       reader.readAsText(file);
     };
     input.click();
@@ -246,12 +282,12 @@ document.addEventListener('DOMContentLoaded', () => {
     panel.hidden = !panel.hidden;
     if (panel.hidden || panel.dataset.started) return;
     panel.dataset.started = '1';
-    const cfg = await loadDiscoveredConfig();
-    await showDiscovered(document.getElementById('discovered-table'), {
-      S, T: window.APKTable,
-      statusEl: document.getElementById('discovered-status'),
-      kinds: Array.isArray(cfg.kinds) ? cfg.kinds : [],
-      tableId: 'snp-discovered',
+    // the Discovered panel is the shared client's (ROAD-3502): kinds in config/discovered.json
+    if (!window.APKSoftapp) return;
+    await window.APKSoftapp.discoveredPanel(document.getElementById('discovered-table'), {
+      status: document.getElementById('discovered-status'),
+      configUrl: './config/discovered.json',
+      id: 'snp-discovered',
       pickLabel: 'Bind',
       onPick: (thing) => {
         if (model.bindDevice(thing)) { changed(); renderAll(); }
