@@ -1,0 +1,12 @@
+{
+  "about": "The SNP Wrangler's signal types (ROAD-3501). A stream stores VIDEO / AUDIO / ANC; each is the ST 2110 essence named here, whose description and signal class come from the CAD catalogue (vendor/apk-vocabulary). label is this editor's short name for it.",
+  "formats": {
+    "only": ["ST2110-20", "ST2110-30", "ST2110-40"],
+    "aliases": { "VIDEO": "ST2110-20", "AUDIO": "ST2110-30", "ANC": "ST2110-40" }
+  },
+  "signalTypes": [
+    { "value": "VIDEO", "label": "VIDEO" },
+    { "value": "AUDIO", "label": "AUDIO" },
+    { "value": "ANC", "label": "ANCILLARY DATA" }
+  ]
+}
