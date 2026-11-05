@@ -1,4 +1,7 @@
 {
   "_about": "What the Discovered panel lists: things on the bus whose kinds (a protocol that saw them, the scanner's kind segment or their device_class) contain one of these words, case-insensitive. Tunables only: source holds no device list. An empty list shows everything.",
-  "kinds": ["nmos"]
+  "_measured": "Bench broker 2026-11-04 (ROAD-3502): confirmed. 'nmos' matches protocol nmos (258 things with device_class 'NMOS Device', e.g. nmos/Device/0191b8d0-b847-5379-abb1-1a2db2849606/device_class 'NMOS Device'), and the dnssd kind _nmos-node__tcp (e.g. dnssd/Device/_nmos-node__tcp/WBS-32me/addresses).",
+  "kinds": [
+    "nmos"
+  ]
 }
