@@ -8,6 +8,9 @@ export class SnpModel {
     this.mgmtIp = initialData?.mgmtIp || '10.200.1.51';
     // The discovered unit this block describes: its MAC or serial (never its IP), '' when unbound.
     this.deviceId = initialData?.deviceId || '';
+    // The BIM part the unit is (e.g. imagine-communications/snp-platform-4a), '' when none was picked: its .ifc type.
+    this.bimId = initialData?.bimId || '';
+    this.hardwareName = initialData?.hardwareName || '';
     this.personalities = initialData?.personalities || ['ST2110-20 HD/UHD', 'ST2110-30 Audio Mux', 'Color Corrector', 'Multiviewer Head'];
 
     this.rows = initialData?.rows || [
@@ -208,6 +211,7 @@ export class SnpModel {
       deviceId: this.deviceId,
       personalities: this.personalities,
       rows: this.rows,
+      ...(this.bimId ? { bimId: this.bimId, hardwareName: this.hardwareName } : {}),
     };
   }
 }

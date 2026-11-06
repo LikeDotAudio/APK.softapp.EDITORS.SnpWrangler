@@ -5,6 +5,7 @@ import { SnpModel } from './snpModel.js';
 import { renderSnpFlowSvg } from './snpSvg.js';
 import { connectSnpHost, blockMeta } from './snpHost.js';
 import { signalTypeOptions } from './signalTypes.js';
+import { snpToIfc, snpFromIfc, schemaOf } from './snpIfc.js';
 
 const S = window.APKSoftapp;
 const esc = S ? S.esc : (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -19,6 +20,23 @@ const host = S ? connectSnpHost(S, state, {
     renderAll();
   },
 }) : null;
+
+/** Save & Return: into the drawing inside the CAD. Standalone: the block .json and its .ifc twin, both or
+    neither (APKSoftapp.saveModel, js/snpIfc.js). */
+async function saveBlock() {
+  if (!host) return;
+  const meta = blockMeta(model);
+  let how;
+  if (host.embedded || typeof S.saveModel !== 'function') {
+    how = host.save(model.toJSON(), meta);
+  } else {
+    const r = await S.saveModel(model.toJSON(), { name: meta.filename, toIfc: (b) => snpToIfc(b, { name: meta.filename }) });
+    if (!r.ok && !r.cancelled) S.showProblem(r.problem || 'save_failed', { onRetry: () => saveBlock() });
+    how = r.ok ? 'model' : '';
+  }
+  const tag = document.getElementById('block-tag');
+  if (tag && how) tag.textContent = how === 'host' ? 'SAVED TO THE CAD' : how === 'model' ? 'SAVED .JSON + .IFC' : 'DOWNLOADED .JSON';
+}
 
 /** Replace the model from a local file (not from the CAD). */
 function loadLocal(next) {
@@ -202,11 +220,11 @@ document.addEventListener('DOMContentLoaded', () => {
     does: 'Lays out the ST 2110 senders of one SNP unit with their primary (red) and secondary (blue, ST 2022-7) multicast legs, and audits the legs for collisions.',
     inputs: [
       { name: 'SNP block', from: 'the CAD drawing (snpwrangler block) when opened from the CAD', kind: 'cad' },
-      { name: 'Block file', from: 'a .json saved by this editor, picked with Open Block', kind: 'file' },
+      { name: 'Block file', from: 'a .json or its .ifc twin saved by this editor, picked with Open Block', kind: 'file' },
       { name: 'Discovered', from: 'what the bus has discovered; which kinds show is config/discovered.json', kind: 'bus' },
     ],
     outputs: [
-      { name: 'SNP block', to: 'the CAD drawing on Save & Return, or a .json download when standalone', kind: 'file' },
+      { name: 'SNP block', to: 'the CAD drawing on Save & Return; standalone, the block .json and its IFC4X3 .ifc twin (Save Model)', kind: 'file' },
       { name: 'Stream CSV', to: '<unit>_streams.csv download (Export CSV)', kind: 'file' },
     ],
     controls: [
@@ -217,7 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
       { name: 'Bind to a discovered unit', how: '⚡ Discovered, then Bind on its row' },
       { name: 'Export CSV / Save & Return / Close', how: 'Top-bar buttons' },
     ],
-    problems: ['file_unreadable', 'bad_json', 'bad_input', 'bus_missing'],
+    problems: ['file_unreadable', 'bad_json', 'bad_input', 'bus_missing', 'save_failed'],
   });
   renderAll();
 
@@ -239,7 +257,29 @@ document.addEventListener('DOMContentLoaded', () => {
     URL.revokeObjectURL(url);
   });
 
-  document.getElementById('btn-open-block')?.addEventListener('click', () => {
+  document.getElementById('btn-open-block')?.addEventListener('click', async () => {
+    if (S && typeof S.openModel === 'function') {
+      const r = await S.openModel({ fromJson: (data) => data });
+      if (!r.ok) { if (!r.cancelled) S.showProblem(r.problem); return; }
+      if (r.kind === 'ifc') {
+        let block;
+        try { block = snpFromIfc(r.text); } catch (err) {
+          S.showProblem('bad_input', { subject: r.name, detail: err.message, fix: ['Open an .ifc saved by this editor, or one with an IfcCommunicationsAppliance and its APK_SnpStream circuits.'] });
+          return;
+        }
+        loadLocal(new SnpModel(block));
+        const tag = document.getElementById('block-tag');
+        if (tag) tag.textContent = `${r.name} · ${schemaOf(r.text)}`;
+        return;
+      }
+      if (!r.model || typeof r.model !== 'object' || !Array.isArray(r.model.rows)) {
+        S.showProblem('bad_input', { subject: r.name, detail: 'This is not an SNP stream block: it has no "rows" list of streams.',
+          fix: ['Open a .json or .ifc saved by this editor (Save & Return when standalone saves both).'] });
+        return;
+      }
+      loadLocal(new SnpModel(r.model));
+      return;
+    }
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.json,.csv';
@@ -295,11 +335,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  document.getElementById('btn-save-block')?.addEventListener('click', () => {
-    const how = host ? host.save(model.toJSON(), blockMeta(model)) : '';
-    const tag = document.getElementById('block-tag');
-    if (tag && how) tag.textContent = how === 'host' ? 'SAVED TO THE CAD' : 'DOWNLOADED .JSON';
-  });
+  document.getElementById('btn-save-block')?.addEventListener('click', () => saveBlock());
 
   document.getElementById('btn-close')?.addEventListener('click', () => {
     if (host) host.close();
