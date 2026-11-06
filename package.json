@@ -1,6 +1,6 @@
 {
   "name": "editors-snp-wrangler",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
   "description": "Selenio Network Processor and SMPTE ST 2110 / ST 2022-7 Red and Blue leg dual-path redundancy wrangler",
   "scripts": {
